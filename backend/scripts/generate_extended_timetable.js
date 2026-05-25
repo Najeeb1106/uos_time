@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { extractSchedule } = require('./src/utils/pdfParser');
+const { extractSchedule } = require('../src/utils/pdfParser');
 
 // Constants for NBS realistic class generator
 const PROGRAMS = [

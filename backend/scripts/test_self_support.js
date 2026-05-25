@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { extractSchedule } = require('./src/utils/pdfParser');
+const { extractSchedule } = require('../src/utils/pdfParser');
 
 async function testSelfSupportIsolation() {
   console.log('🧪 Testing E2E Self Support Isolation (Self Support 1 vs 2)...');
