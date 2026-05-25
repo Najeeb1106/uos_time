@@ -41,6 +41,8 @@ export default function UploadPage() {
   const [editingClassId, setEditingClassId] = useState(null);
   const [editFormData, setEditFormData] = useState({});
   const [errorMessage, setErrorMessage] = useState('');
+  const [isScannedFallback, setIsScannedFallback] = useState(false);
+  const [scannedMessage, setScannedMessage] = useState('');
 
   const fileInputRef = useRef(null);
 
@@ -121,8 +123,8 @@ export default function UploadPage() {
       return;
     }
 
-    if (selectedFile.size > 10 * 1024 * 1024) {
-      setErrorMessage('File size exceeds 10MB limit. Please upload a smaller compressed PDF.');
+    if (selectedFile.size > 25 * 1024 * 1024) {
+      setErrorMessage('File size exceeds 25MB limit. Please upload a smaller compressed PDF.');
       return;
     }
 
@@ -152,6 +154,8 @@ export default function UploadPage() {
     setParseStep('parsing');
     setParseProgress(10);
     setParseStatusText('Uploading PDF to secure server...');
+    setIsScannedFallback(false);
+    setScannedMessage('');
 
     try {
       setParseProgress(40);
@@ -167,6 +171,11 @@ export default function UploadPage() {
       
       setParseProgress(100);
       setParseStatusText('Successfully parsed timetable!');
+
+      if (result.isScannedFallback) {
+        setIsScannedFallback(true);
+        setScannedMessage(result.message || '');
+      }
 
       if (classes.length === 0) {
         setErrorMessage(`No matching classes found in PDF for Semester ${userSemester} [${user?.type}]. You can manually add classes or re-check profile.`);
@@ -340,7 +349,7 @@ export default function UploadPage() {
               Drag and drop your official PDF here
             </h3>
             <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-              Supports official Department Timetable files up to 10MB
+              Supports official Department Timetable files up to 25MB
             </p>
           </div>
 
@@ -418,6 +427,27 @@ export default function UploadPage() {
               </button>
             </div>
           </div>
+
+          {isScannedFallback && (
+            <div className="glass-panel animate-fade-in" style={{
+              padding: '1.25rem 1.5rem',
+              borderLeft: '4px solid var(--warning)',
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, var(--glass-bg) 100%)',
+              color: 'var(--text-primary)',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '1rem',
+              boxShadow: '0 4px 20px rgba(245, 158, 11, 0.08)'
+            }}>
+              <AlertCircle size={20} color="var(--warning)" style={{ flexShrink: 0, marginTop: '0.15rem' }} />
+              <div>
+                <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>Scanned PDF Timetable Preloaded</h4>
+                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                  {scannedMessage || "Notice: The PDF is formatted as a scanned graphic (no extractable text). To save you time, we pre-loaded your program's authentic schedule, which you can easily customize manually below!"}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* List of Parsed Classes Cards */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

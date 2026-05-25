@@ -20,6 +20,18 @@ const safeGet = (key, fallback) => {
   }
 };
 
+// Retrieve stored token but discard any stale dev mock token
+const safeGetToken = () => {
+  try {
+    const stored = localStorage.getItem('uos_token');
+    if (!stored || stored === 'mock-jwt-session-token') return null;
+    return stored;
+  } catch (e) {
+    return null;
+  }
+};
+
+
 // Premium Mock Timetable Data for immediate visual excellence when not logged in
 const mockClasses = [
   {
@@ -156,16 +168,8 @@ const mockClasses = [
 
 export const useStore = create((set, get) => ({
   // Authentication State
-  user: safeParse('uos_user', {
-    email: 'student@uos.edu.pk',
-    fullName: 'Ahmed Ali',
-    role: 'student',
-    program: 'BS in Software Engineering',
-    type: 'Regular',
-    batch: '2024-2028',
-    semester: 2
-  }),
-  token: safeGet('uos_token', 'mock-jwt-session-token'),
+  user: safeParse('uos_user', null),
+  token: safeGetToken(),
   
   // Timetable State
   classes: safeParse('uos_classes', mockClasses),
@@ -284,6 +288,38 @@ export const useStore = create((set, get) => ({
     localStorage.removeItem('uos_parse_file_name');
   },
 
+  forgotPassword: async (email) => {
+    try {
+      const res = await fetch(`${API_URL}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      return data; // includes devResetToken and resetUrl in local/dev mode
+    } catch (error) {
+      console.error('ForgotPassword action error:', error);
+      throw error;
+    }
+  },
+
+  resetPassword: async (token, newPassword) => {
+    try {
+      const res = await fetch(`${API_URL}/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, newPassword })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      return data;
+    } catch (error) {
+      console.error('ResetPassword action error:', error);
+      throw error;
+    }
+  },
+
   updateProfile: async (profileData) => {
     const { token } = get();
     try {
@@ -357,7 +393,9 @@ export const useStore = create((set, get) => ({
       
       return {
         classes: data.classes,
-        pdfFileName: data.pdfFileName
+        pdfFileName: data.pdfFileName,
+        isScannedFallback: data.isScannedFallback,
+        message: data.message
       };
     } catch (error) {
       console.error('Parse Timetable File action error:', error);

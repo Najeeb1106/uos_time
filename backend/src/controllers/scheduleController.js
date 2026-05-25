@@ -39,6 +39,8 @@ exports.uploadSchedule = async (req, res) => {
       user.fullName
     );
 
+    const isScannedFallback = !!parsedClasses.isScannedFallback;
+
     // Extract and save unfiltered global schedule for the Free Room Finder in Firestore
     try {
       const allLectures = await extractSchedule(req.file.buffer, null, null, null, null, 'global');
@@ -54,9 +56,12 @@ exports.uploadSchedule = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: `Parsed ${parsedClasses.length} matching schedule lectures successfully.`,
+      message: isScannedFallback 
+        ? `Notice: The Noon Business School PDF is scanned (no selectable text). To save you time, we have preloaded your program's authentic schedule, which you can customize manually!`
+        : `Parsed ${parsedClasses.length} matching schedule lectures successfully.`,
       classes: parsedClasses,
-      pdfFileName: req.file.originalname
+      pdfFileName: req.file.originalname,
+      isScannedFallback
     });
 
   } catch (error) {

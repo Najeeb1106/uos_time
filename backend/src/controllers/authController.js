@@ -1,6 +1,10 @@
 const { db, auth, isFirebaseMode } = require('../config/firebase');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const path = require('path');
+const fs = require('fs');
 const JWT_SECRET = process.env.JWT_SECRET || 'uos-timetable-development-secret-key';
+
 
 /**
  * Register a new student profile and create user auth record
@@ -33,10 +37,10 @@ exports.register = async (req, res) => {
       }
     }
 
-    if (!email.endsWith('@uos.edu.pk')) {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return res.status(400).json({
         success: false,
-        message: 'Registration requires a valid university email address (@uos.edu.pk).'
+        message: 'Please provide a valid email address.'
       });
     }
 
@@ -352,4 +356,146 @@ exports.updateProfile = async (req, res) => {
     });
   }
 };
+// ── Reset Token Store (local JSON file or in-memory for Firebase mode) ──────
+const dataDir = path.join(__dirname, '..', '..', 'data');
+const tokensFile = path.join(dataDir, 'reset_tokens.json');
 
+const readTokens = () => {
+  try {
+    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+    if (!fs.existsSync(tokensFile)) fs.writeFileSync(tokensFile, '{}');
+    return JSON.parse(fs.readFileSync(tokensFile, 'utf8') || '{}');
+  } catch (e) { return {}; }
+};
+
+const writeTokens = (data) => {
+  try {
+    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+    fs.writeFileSync(tokensFile, JSON.stringify(data, null, 2));
+  } catch (e) { /* silent */ }
+};
+
+/**
+ * Initiate forgot password: generate a reset token for the given email.
+ * In local/dev mode the token is returned in the response so users can
+ * paste it straight into the reset form (no SMTP required).
+ */
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Please provide your university email address.' });
+    }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid email address.' });
+    }
+
+    // Look up user — works in both Firebase and Local mode
+    let uid = null;
+    try {
+      const userRecord = await auth.getUserByEmail(email);
+      uid = userRecord.uid;
+    } catch (err) {
+      // Don't reveal whether the email exists — always return success
+      console.warn('[ForgotPassword] Email not found:', email);
+      return res.status(200).json({
+        success: true,
+        message: 'If that email is registered, a reset link has been generated.',
+        // In prod: send email. In dev: return nothing extra for unknown addresses.
+      });
+    }
+
+    // Generate a cryptographically secure 64-char hex token
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = Date.now() + 30 * 60 * 1000; // 30 minutes
+
+    // Persist token (local JSON file; for Firebase you would use Firestore)
+    const tokens = readTokens();
+    // Invalidate any existing token for this user
+    for (const key of Object.keys(tokens)) {
+      if (tokens[key].uid === uid) delete tokens[key];
+    }
+    tokens[token] = { uid, email, expiresAt };
+    writeTokens(tokens);
+
+    console.log(`[ForgotPassword] Reset token generated for ${email}: ${token}`);
+
+    // In production you would send an email here.
+    // For dev/local mode we return the token in the response so users can use it immediately.
+    return res.status(200).json({
+      success: true,
+      message: 'Password reset token generated. Use it within 30 minutes.',
+      // ⚠️  Dev-only: strip this from the response before going to production!
+      devResetToken: token,
+      resetUrl: `http://localhost:5173/reset-password?token=${token}`,
+    });
+
+  } catch (error) {
+    console.error('ForgotPassword Controller Error:', error);
+    return res.status(500).json({ success: false, message: 'An internal server error occurred.' });
+  }
+};
+
+/**
+ * Complete the password reset: validate token and update password.
+ */
+exports.resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Reset token and new password are required.' });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long.' });
+    }
+
+    const tokens = readTokens();
+    const entry = tokens[token];
+
+    if (!entry) {
+      return res.status(400).json({ success: false, message: 'Invalid or already used reset token.' });
+    }
+    if (Date.now() > entry.expiresAt) {
+      delete tokens[token];
+      writeTokens(tokens);
+      return res.status(400).json({ success: false, message: 'Reset token has expired. Please request a new one.' });
+    }
+
+    const { uid } = entry;
+
+    // Update password in the user profile (passwordHash field)
+    const userDoc = await db.collection('users').doc(uid).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    // Update password in auth layer (Firebase or local mock)
+    if (isFirebaseMode) {
+      try {
+        await auth.updateUser(uid, { password: newPassword });
+      } catch (err) {
+        console.error('[ResetPassword] Firebase auth update error:', err.message);
+        return res.status(400).json({ success: false, message: 'Failed to update authentication credentials.' });
+      }
+    }
+
+    // Update passwordHash in users collection (used by local login)
+    await db.collection('users').doc(uid).set({ passwordHash: newPassword }, { merge: true });
+
+    // Invalidate the token so it cannot be reused
+    delete tokens[token];
+    writeTokens(tokens);
+
+    console.log(`[ResetPassword] Password successfully reset for uid: ${uid}`);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Your password has been reset successfully. You can now sign in with your new password.',
+    });
+
+  } catch (error) {
+    console.error('ResetPassword Controller Error:', error);
+    return res.status(500).json({ success: false, message: 'An internal server error occurred.' });
+  }
+};

@@ -69,7 +69,7 @@ app.use((err, req, res, next) => {
   if (err.code === 'LIMIT_FILE_SIZE') {
     return res.status(400).json({
       success: false,
-      message: 'File upload size exceeds the maximum 10MB limit.'
+      message: 'File upload size exceeds the maximum 25MB limit.'
     });
   }
 

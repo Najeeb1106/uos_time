@@ -159,6 +159,19 @@ async function extractSchedule(pdfBuffer, userBatch, userSemester, userType, use
     const parser = new pdfImport.PDFParse({ data: new Uint8Array(pdfBuffer) });
     await parser.load();
 
+    // ── Scanned PDF / Vector Outline Timetable Fallback ───────────────────────
+    let totalTextLength = 0;
+    for (let pageNum = 1; pageNum <= parser.doc.numPages; pageNum++) {
+      const page = await parser.doc.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      totalTextLength += textContent.items.map(item => item.str).join(' ').length;
+    }
+
+    if (totalTextLength < 100) {
+      console.log(`[pdfParser] Scanned PDF detected (totalTextLength: ${totalTextLength}).`);
+      throw new Error("This PDF appears to be a scanned image or contains no extractable text. Please ensure you upload the official, digitally-exported PDF of your department timetable.");
+    }
+
     const allLectures = [];
 
     for (let pageNum = 1; pageNum <= parser.doc.numPages; pageNum++) {

@@ -4,6 +4,8 @@ import { useStore } from './store/useStore';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import WeeklySchedule from './pages/WeeklySchedule';
 import FreeRooms from './pages/FreeRooms';
@@ -14,7 +16,8 @@ import Profile from './pages/Profile';
 function ProtectedRoute({ children }) {
   const token = useStore((state) => state.token);
   
-  if (!token) {
+  // Reject null or any stale mock token leftover from development
+  if (!token || token === 'mock-jwt-session-token') {
     return <Navigate to="/login" replace />;
   }
   
@@ -38,7 +41,7 @@ export default function App() {
   const themeMode = useStore((state) => state.themeMode);
 
   React.useEffect(() => {
-    if (token && token !== 'mock-jwt-session-token') {
+    if (token) {
       fetchCurrentSchedule();
     }
   }, [token, fetchCurrentSchedule]);
@@ -72,6 +75,8 @@ export default function App() {
             </AuthRoute>
           } 
         />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Protected Dashboard/Timetable Routes */}
         <Route 

@@ -441,7 +441,21 @@ export default function Profile() {
                           <option value="BS in Software Engineering">BS Software Eng.</option>
                           <option value="BS in Computer Science">BS Computer Sci.</option>
                           <option value="BS in Information Technology">BS Info. Tech.</option>
+                          <option value="BS in Artificial Intelligence">BS Artificial Intelligence</option>
+                          <option value="BS in Data Science">BS Data Science</option>
+                          <option value="BS in Cyber Security">BS Cyber Security</option>
                           <option value="MS in Software Engineering">MS Software Eng.</option>
+                          <option value="MS in Computer Science">MS Computer Sci.</option>
+                          <option value="MS in Information Technology">MS Info. Tech.</option>
+                          <option value="MS in Artificial Intelligence">MS Artificial Intelligence</option>
+                          <option value="MS in Data Science">MS Data Science</option>
+                          <option value="MS in Cyber Security">MS Cyber Security</option>
+                          <option value="PhD in Software Engineering">PhD Software Eng.</option>
+                          <option value="PhD in Computer Science">PhD Computer Sci.</option>
+                          <option value="PhD in Information Technology">PhD Info. Tech.</option>
+                          <option value="PhD in Artificial Intelligence">PhD Artificial Intelligence</option>
+                          <option value="PhD in Data Science">PhD Data Science</option>
+                          <option value="PhD in Cyber Security">PhD Cyber Security</option>
                         </select>
                       </div>
                     </div>
