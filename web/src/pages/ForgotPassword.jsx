@@ -307,26 +307,54 @@ export default function ForgotPassword() {
                   </div>
                 )}
 
-                {/* Proceed to Reset Button */}
-                <div className="btn-pill-row" style={{ marginTop: '0.5rem' }}>
-                  <button
-                    className="btn-pill-primary"
-                    style={{ flex: 1.4 }}
-                    onClick={() => navigate(`/reset-password?token=${result.devResetToken || ''}`)}
-                  >
-                    Set New Password <ArrowRight size={16} />
-                  </button>
-                  <button
-                    className="btn-pill-secondary"
-                    onClick={() => navigate('/login')}
-                  >
-                    Sign In
-                  </button>
-                </div>
-
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center', marginTop: '1.25rem', opacity: 0.7 }}>
-                  ⚠️ In production, this token would be emailed securely instead of shown here.
-                </p>
+                {/* Proceed to Reset Button / Production Instructions */}
+                {result.devResetToken ? (
+                  <>
+                    <div className="btn-pill-row" style={{ marginTop: '0.5rem' }}>
+                      <button
+                        className="btn-pill-primary"
+                        style={{ flex: 1.4 }}
+                        onClick={() => navigate(`/reset-password?token=${result.devResetToken || ''}`)}
+                      >
+                        Set New Password <ArrowRight size={16} />
+                      </button>
+                      <button
+                        className="btn-pill-secondary"
+                        onClick={() => navigate('/login')}
+                      >
+                        Sign In
+                      </button>
+                    </div>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center', marginTop: '1.25rem', opacity: 0.7 }}>
+                      ⚠️ In production, this token would be emailed securely instead of shown here.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ 
+                      background: 'rgba(59, 130, 246, 0.06)',
+                      border: '1px solid var(--glass-border)',
+                      borderRadius: '12px',
+                      padding: '1rem 1.25rem',
+                      marginBottom: '1.5rem',
+                      color: 'var(--text-secondary)',
+                      fontSize: '0.85rem',
+                      lineHeight: 1.55,
+                      textAlign: 'justify'
+                    }}>
+                      📬 A secure password reset link has been dispatched to your email address. Please check your inbox (and spam folder) and follow the link inside the email to safely reset your password.
+                    </div>
+                    <div className="btn-pill-row" style={{ marginTop: '0.5rem' }}>
+                      <button
+                        className="btn-pill-primary"
+                        style={{ flex: 1 }}
+                        onClick={() => navigate('/login')}
+                      >
+                        Back to Sign In <ArrowRight size={16} />
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
