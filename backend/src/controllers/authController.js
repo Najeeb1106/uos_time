@@ -3,7 +3,45 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
 const JWT_SECRET = process.env.JWT_SECRET || 'uos-timetable-development-secret-key';
+
+// Helper to send password reset email via Firebase Identity Toolkit REST API
+const sendFirebaseResetEmail = (email, apiKey) => {
+  return new Promise((resolve, reject) => {
+    const postData = JSON.stringify({
+      requestType: 'PASSWORD_RESET',
+      email: email
+    });
+
+    const options = {
+      hostname: 'identitytoolkit.googleapis.com',
+      port: 443,
+      path: `/v1/accounts:sendOobCode?key=${apiKey}`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(JSON.parse(data));
+        } else {
+          reject(new Error(`Firebase REST API Error: ${data}`));
+        }
+      });
+    });
+
+    req.on('error', (e) => { reject(e); });
+    req.write(postData);
+    req.end();
+  });
+};
 
 
 /**
@@ -422,6 +460,17 @@ exports.forgotPassword = async (req, res) => {
 
     // Check if we are running in production mode
     const isProduction = process.env.NODE_ENV === 'production';
+    const webApiKey = process.env.FIREBASE_WEB_API_KEY;
+
+    if (isProduction && webApiKey) {
+      try {
+        console.log(`[ForgotPassword] Requesting Firebase to send native reset email to ${email}`);
+        await sendFirebaseResetEmail(email, webApiKey);
+        console.log(`[ForgotPassword] Firebase reset email sent successfully to ${email}`);
+      } catch (err) {
+        console.error('[ForgotPassword] Failed to send Firebase native reset email:', err.message);
+      }
+    }
 
     const responseData = {
       success: true,
