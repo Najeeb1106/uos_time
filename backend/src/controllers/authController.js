@@ -43,6 +43,44 @@ const sendFirebaseResetEmail = (email, apiKey) => {
   });
 };
 
+// Helper to verify credentials via Firebase Identity Toolkit REST API (signInWithPassword)
+const verifyFirebasePassword = (email, password, apiKey) => {
+  return new Promise((resolve, reject) => {
+    const postData = JSON.stringify({
+      email: email,
+      password: password,
+      returnSecureToken: true
+    });
+
+    const options = {
+      hostname: 'identitytoolkit.googleapis.com',
+      port: 443,
+      path: `/v1/accounts:signInWithPassword?key=${apiKey}`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(JSON.parse(data));
+        } else {
+          reject(new Error(`Firebase Auth Error: ${data}`));
+        }
+      });
+    });
+
+    req.on('error', (e) => { reject(e); });
+    req.write(postData);
+    req.end();
+  });
+};
+
 
 /**
  * Register a new student profile and create user auth record
@@ -237,11 +275,42 @@ exports.login = async (req, res) => {
     }
 
     // Verify password match
-    if (userRecord.passwordHash !== password) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication failed. Incorrect security password.'
-      });
+    let isAuthenticated = false;
+    const webApiKey = process.env.FIREBASE_WEB_API_KEY;
+
+    if (isFirebaseMode && webApiKey) {
+      try {
+        console.log(`[Login] Authenticating user password with Firebase Auth Service for ${email}`);
+        await verifyFirebasePassword(email, password, webApiKey);
+        isAuthenticated = true;
+        console.log(`[Login] Firebase Auth authenticated successfully for ${email}`);
+        
+        // Sync the new password to the Firestore user doc passwordHash to keep them in sync
+        if (userRecord.passwordHash !== password) {
+          await db.collection('users').doc(uid).set({ passwordHash: password }, { merge: true });
+          userRecord.passwordHash = password; // update the local reference too
+        }
+      } catch (err) {
+        console.warn('[Login] Firebase Auth service authentication failed:', err.message);
+        // If it was a wrong password, fail immediately.
+        if (err.message.includes('INVALID_PASSWORD') || err.message.includes('EMAIL_NOT_FOUND')) {
+          return res.status(401).json({
+            success: false,
+            message: 'Authentication failed. Incorrect security password.'
+          });
+        }
+        // For other network/config failures, we fall back to Firestore document check below
+      }
+    }
+
+    if (!isAuthenticated) {
+      // Fallback/Local mode check: verify password against stored Firestore passwordHash
+      if (userRecord.passwordHash !== password) {
+        return res.status(401).json({
+          success: false,
+          message: 'Authentication failed. Incorrect security password.'
+        });
+      }
     }
 
     // Generate secure session JWT token
